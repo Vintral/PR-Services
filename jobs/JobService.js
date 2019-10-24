@@ -1,6 +1,8 @@
+const dir = process.cwd();
+
 const redis = require( 'redis' );
-const Logger = require( '../common/logger' );
-const database = require( '../common/database' );
+const Logger = require( './logger' );
+const database = require( './database' );
 const ItemManager = require( './item-manager' );
 const guid = require('node-uuid');
 

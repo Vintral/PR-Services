@@ -1,9 +1,9 @@
 const redis = require( 'redis' );
-const Logger = require( '../../logger' );
-const database = require( '../../database' );
+const Logger = require( './logger' );
+const database = require( './database' );
 
 const firebase = require( 'firebase-admin' );
-const firebaseServiceAccount = require( '../../serviceAccountKey.json' );
+const firebaseServiceAccount = require( './serviceAccountKey.json' );
 
 //==========================================//
 //	Constants								//
