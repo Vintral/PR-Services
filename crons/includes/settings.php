@@ -9,4 +9,6 @@
 	$username = "pocket_realm_user";
 	$password = "Dt9Lpmr5DNfs7WKM";
 	$db = "PocketRealm";
+
+	$redis = "pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com";
 ?>

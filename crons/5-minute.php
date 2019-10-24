@@ -6,7 +6,7 @@
 
 	// Create and connect to redis
 	$redis = new Redis();
-	$redis->connect( '127.0.0.1' );
+	$redis->connect( $redis );
 
 	$foodPerPopulation = 1;
 	$goldPerPopulation = 1;
