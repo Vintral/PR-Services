@@ -1,7 +1,7 @@
 const redis = require( 'redis' );
-const Logger = require( '../../logger' );
-const database = require( '../../database' );
-const ItemManager = require( '../../item-manager' );
+const Logger = require( '../common/logger' );
+const database = require( '../common/database' );
+const ItemManager = require( './item-manager' );
 const guid = require('node-uuid');
 
 // Make sure the ItemManager has a database
