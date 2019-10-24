@@ -22,7 +22,12 @@ firebase.initializeApp( {
 //==========================================//
 //	Redis									//
 //==========================================//
-const redisListener = redis.createClient();
+const redisInfo = {
+    server: "pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com",
+    port:6379
+}
+
+const redisListener = redis.createClient( redisInfo.port, redisInfo.server );
 redisListener.on( "error", onError );
 redisListener.on( "ready", onReady );
 redisListener.on( "connect", onConnect );
