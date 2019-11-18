@@ -1,4 +1,5 @@
 const redis = require( 'redis' );
+const { promisify } = require( 'util' );
 const Logger = require( './logger' );
 const database = require( './database' );
 const guid = require('node-uuid');
@@ -21,6 +22,12 @@ redisListener.on( "message", onMessage );
 //	Redis Pusher							//
 //============================//
 const redisClient = redis.createClient( redisInfo.port, redisInfo.server );
+const addAsync = promisify( redisClient.zadd ).bind( redisClient );
+const getRange = promisify( redisClient.zrevrange ).bind( redisClient );
+const getRank = promisify( redisClient.zrevrank ).bind( redisClient );
+const getTotal = promisify( redisClient.zcount ).bind( redisClient );
+const removeAsync = promisify( redisClient.zrem ).bind( redisClient );
+
 redisClient.on( "ready", () => { Logger.logServer( "Redis Client Ready" ); } );
 
 //============================//
@@ -37,6 +44,7 @@ async function onReady() {
     redisListener.subscribe( "SET_POWER" );
     redisListener.subscribe( "GET_RANK" );
     redisListener.subscribe( "GET_RANKINGS" );
+    redisListener.subscribe( "GET_TOP_RANKINGS" );
 }
 
 async function onConnect() {
@@ -46,54 +54,51 @@ async function onConnect() {
 async function onMessage( channel, data ) {
     Logger.logServer( "Message: " + channel + ":" + data );
     
-    /*data = JSON.parse( data );
-    const { userid } = data;
-
+    data = JSON.parse( data );
+    
     let result = "";
     switch( channel ) {
-        case "USER_ONLINE":
-            Logger.logServer( "USER IS ONLINE" );
+      case "SET_POWER":
+        Logger.logServer( "SET POWER" );
+        console.log( data );
+        
+        await removeAsync( "round-" + data.roundid, "2" );
+        await removeAsync( "round-" + data.roundid, "3" );
+        await removeAsync( "round-" + data.roundid, "4" );
 
-            // See if we've had any jobs claimed in within our throttle timer
-            let lastQuery = "SELECT id FROM users_job_history WHERE userid = " + userid + " AND time > UNIX_TIMESTAMP() - " + throttle + " LIMIT 1";
-            result = await database.getOne( lastQuery );
-            if( result ){
-                // Start up a timer
-                setTimer( userid );
-                break;    
-            }
+        let result = await addAsync( "round-" + data.roundid, data.power, data.username );        
+        console.log( result );
 
-            // We have no recent ads claimed, let's let them know we're ready!
-            dispatch( "JOB_READY", userid );
-            setTimer( userid ); // To DO - REMOVE THIS
-            break;
-        case "USER_OFFLINE":
-            Logger.logServer( "USER IS OFFLINE" );
-            clearTimer( userid );
-            break;
-        case "CLAIM_JOB":
-            Logger.logServer( "USER CLAIMED JOB" );
+        result = await getRange( "round-" + data.roundid, 0, 10 );
+        console.log( result );
 
-            const { job } = data;
-            await claimJob( userid, job );
+        result = await getRange( "round-" + data.roundid, 0, 10, "withscores" );
+        console.log( result );
+        break;
+      case "GET_RANKINGS":
+        console.log( "GET_RANKINGS" );
 
+        let rank = await getRank( "round-" + data.roundid, data.username );
+        let total = await getTotal( "round-" + data.roundid, "-inf", "+inf" );
+        let min = Math.max( 0, rank - 10 );
+        let max = Math.min( total, rank + 10 );
+        let ranks = await getRange( "round-" + data.roundid, min, max, "withscores" );        
 
-            //const { reward } = data;
-            //const recordQuery = "INSERT INTO users_job_history SET userid = " + userid + ", reward = '" + reward + "', time = UNIX_TIMESTAMP()";
-            //result = await database.execute( recordQuery );
-            //console.log( result );
+        let packet = {};
+        packet.command = "GET_RANKINGS";
+        packet.start = min + 1;
+        packet.ranks = [];
+        packet.request = data.request;
+        for( let i = 0; i < ranks.length; i += 2 ) {
+          packet.ranks.push( ranks[ i ] + "|||" + ranks[ i + 1 ] );
+        }        
 
-            setTimer( userid );
-            break;
-        case "GET_JOBS":
-            Logger.logServer( "GET_JOBS" );
-            getJobs( userid );
-            break;
-        case "CLEAR_JOBS":
-            Logger.logServer( "CLEAR_JOBS" );
-            clearJobs( userid );
-            break;
-    }*/
+        redisClient.publish( data.server, JSON.stringify( packet ) );
+        break;
+      case "GET_TOP_RANKINGS":
+        console.log( "GET_TOP_RANKINGS" );
+        break;
+    }
 }
 
 //============================//
