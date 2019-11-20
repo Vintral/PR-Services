@@ -7,10 +7,10 @@ class Database {
 	public function __construct() {
 		$this->debug( "Created" );
 		
-		$this->servername = "localhost";
-		$this->username = "temp";
-		$this->password = "t3mp";
-		$this->db = "temp";
+		$this->servername = 'pocket-realm.ctwbpohhunlz.us-west-1.rds.amazonaws.com';
+		$this->username = "pocket_realm_user";
+		$this->password = "Dt9Lpmr5DNfs7WKM";
+		$this->db = "PocketRealm";
 		
 		$this->load();
 	}
