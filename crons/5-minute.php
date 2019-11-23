@@ -46,10 +46,11 @@
 	function processGoldDeficits() {
 		global $database;
 		
-		$users = $database->query( "SELECT userid, roundid, gold + ( gold_income - gold_upkeep ) AS goldDeficit FROM users_rounds WHERE ( gold_income - gold_upkeep ) < 0 AND gold + gold_income < gold_upkeep" );
+		$users = $database->query( "SELECT userid, roundid, gold + ( gold_income - gold_upkeep ) AS goldDeficit FROM users_rounds WHERE ( gold_income - gold_upkeep ) < 0 AND gold + gold_income < gold_upkeep" );		
 		if( $users && $users->num_rows > 0 ) {
 			while( $user = $users->fetch_object() ) {				
 				//Grab their units ordered by food upkeep				
+				print_r( "SELECT quantity, unitid, ( quantity * upkeep_gold ) AS upkeep, upkeep_gold, name, plural FROM users_rounds_units INNER JOIN units ON units.id = unitid WHERE userid = $user->userid AND roundid = $user->roundid ORDER BY upkeep DESC LIMIT 1" );
 				$units = $database->query( "SELECT quantity, unitid, ( quantity * upkeep_gold ) AS upkeep, upkeep_gold, name, plural FROM users_rounds_units INNER JOIN units ON units.id = unitid WHERE userid = $user->userid AND roundid = $user->roundid ORDER BY upkeep DESC LIMIT 1" );				
 				if( $units && $units->num_rows > 0 ) {					
 					//They have units, so let's take some of them					
@@ -161,19 +162,19 @@
 	if( !$database->connect_error ){
 		//See who doesn't have enough gold for their upkeep		
 		processGoldDeficits();
-		print_r( "Did gold" );
+		print_r( "Did gold\n" );
 
 		//Check for people who can't feed their troops/people		
 		processFoodDeficits();
-		print_r( "Did food" );
+		print_r( "Did food\n" );
 
 		// Check for people over the max population
 		processPopulationDeficits();
-		print_r( "Did population" );
+		print_r( "Did population\n" );
 		
 		//Update User Values
 		$database->query( "UPDATE users_rounds SET food = food + ( food_income - food_upkeep ), stone = stone + ( stone_income - stone_upkeep ), wood = wood + ( wood_income - wood_upkeep ), faith = faith + ( faith_income - faith_upkeep ), mana = mana + ( mana_income - mana_upkeep ), gold = gold + ( gold_income - gold_upkeep ), metal = metal + ( metal_income - metal_upkeep) WHERE active = 1" );
-		print_r( "Did users" );
+		print_r( "Did users\n" );
 		
 		//Various error correction queries
 		$database->query( "UPDATE users_rounds SET gold = 0 WHERE gold < 0" );
@@ -194,6 +195,7 @@
 				$round->energy = 100;
 				
 				$message = "Energy has maxxed out!";
+				print_r( "SELECT users_rounds.userid FROM users_rounds INNER JOIN users_notifications_settings ON users_rounds.userid = users_notifications_settings.userid WHERE type = 'energy' AND roundid = $round->id AND energy < $round->max_energy AND energy + $round->energy >= $round->max_energy\n" );
 				$fullTurnUsers = $database->query( "SELECT users_rounds.userid FROM users_rounds INNER JOIN users_notifications_settings ON users_rounds.userid = users_notifications_settings.userid WHERE type = 'energy' AND roundid = $round->id AND energy < $round->max_energy AND energy + $round->energy >= $round->max_energy" );
 				if( $fullTurnUsers ) while( $u = $fullTurnUsers->fetch_object() ) {
 					$packet = new stdClass();
