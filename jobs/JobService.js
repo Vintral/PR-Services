@@ -6,6 +6,8 @@ const database = require( './database' );
 const ItemManager = require( './item-manager' );
 const guid = require('node-uuid');
 
+require('dotenv').config();
+
 // Make sure the ItemManager has a database
 ItemManager.database = database;
 
@@ -21,8 +23,8 @@ let users = {};
 //	Redis Listener							//
 //==========================================//
 const redisInfo = {
-    server: "pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com",
-    port:6379
+    server: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT
 }
 
 const redisListener = redis.createClient( redisInfo.port, redisInfo.server );
@@ -63,7 +65,7 @@ async function onMessage( channel, data ) {
     Logger.logServer( "Message: " + channel + ":" + data );
     
     data = JSON.parse( data );
-    const { userid } = data;
+    const { server, userid } = data;
 
     let result = "";
     switch( channel ) {
@@ -75,22 +77,22 @@ async function onMessage( channel, data ) {
             result = await database.getOne( lastQuery );
             if( result ){
                 // Start up a timer
-                setTimer( userid );
+                setTimer( server, userid );
                 break;    
             }
 
             // We have no recent ads claimed, let's let them know we're ready!
-            dispatch( "JOB_READY", userid );
-            setTimer( userid ); // To DO - REMOVE THIS
+            dispatch( server, { command:'JOB_READY', user:userid } );
+            setTimer( server, userid ); // To DO - REMOVE THIS
             break;
         case "USER_OFFLINE":
-            Logger.logServer( "USER IS OFFLINE" );
+            Logger.logServer( "USER IS OFFLINE: " + userid );
             clearTimer( userid );
             break;
         case "CLAIM_JOB":
             Logger.logServer( "USER CLAIMED JOB" );
 
-            const { job } = data;
+            const { job } = data;            
             await claimJob( userid, job );
 
 
@@ -103,7 +105,9 @@ async function onMessage( channel, data ) {
             break;
         case "GET_JOBS":
             Logger.logServer( "GET_JOBS" );
-            getJobs( userid );
+
+            console.log( data );
+            getJobs( userid, data.server, data.request );
             break;
         case "CLEAR_JOBS":
             Logger.logServer( "CLEAR_JOBS" );
@@ -120,11 +124,14 @@ function clearTimer( userid ) {
         clearTimeout( users[ userid ] );
 }
 
-function setTimer( userid ) {
+function setTimer( server, userid ) {
     clearTimer( userid );
-    users[ userid ] = setTimeout( () => {
-        dispatch( "JOB_READY", userid );
-    }, 1000 * throttle );
+    users[ userid ] = {
+        server,
+        timer: setTimeout( () => {
+            dispatch( server, { command:'JOB_READY', user:userid } );
+        }, 1000 * throttle )
+    };
 }
 
 async function claimJob( userid, job ) {
@@ -190,7 +197,7 @@ async function clearJobs( userid ) {
     dispatch( "JOBS_CLEARED", userid );
 }
 
-async function getJobs( userid ) {
+async function getJobs( userid, server, request ) {
     Logger.logServer( "getJobs" );
         
     await checkJobs( userid );
@@ -206,9 +213,9 @@ async function getJobs( userid ) {
     
     let packet = {};
     packet.jobs = jobs;
-    packet.vault = { current: vault[ 0 ].current_items, max: vault[ 0 ].vault_size };
+    packet.vault = { current: vault[ 0 ].current_items, max: vault[ 0 ].vault_size };    
 
-    dispatch( "JOBS_RETRIEVED", userid, packet );
+    dispatch( server, { command:'JOBS', request, packet } );
 }
 
 function dispatchError( userid, msg ) {
@@ -220,14 +227,13 @@ function dispatchError( userid, msg ) {
     redisClient.publish( "JOB_ERROR", JSON.stringify( packet ) );
 }
 
-function dispatch( type, userid, data ) {
-    Logger.logServer( "Dispatch: " + type + " - " + userid + ( data ? " : " + JSON.stringify( data ) : "" ) );
+function dispatch( type, data ) {
+    Logger.logServer( "Dispatch: " + type + " - " + ( data ? " : " + JSON.stringify( data ) : "" ) );
 
-    let packet = {};
-    packet.userid = userid;
-    if( data ) packet.data = data;
+    /*let packet = data;
+    packet.data = data;*/
 
-    redisClient.publish( type, JSON.stringify( packet ) );
+    redisClient.publish( type, JSON.stringify( data ) );
 }
 
 Logger.logServer( "Job Service Started" );
