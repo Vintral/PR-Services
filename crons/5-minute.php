@@ -1,6 +1,6 @@
 <?php
-	include_once( "includes/settings.php" );
-	
+  include_once( "includes/settings.php" );
+    
 	// Create connection
 	$database = new mysqli( $servername, $username, $password, $db );
 
@@ -192,12 +192,13 @@
 				//$database->query ( "DELETE FROM rankings WHERE roundid = 0" );
 				
 				//Update Users energy
-				$round->energy = 100;
+				//$round->energy = 100;
 				
 				$message = "Energy has maxxed out!";
 				print_r( "SELECT users_rounds.userid FROM users_rounds INNER JOIN users_notifications_settings ON users_rounds.userid = users_notifications_settings.userid WHERE type = 'energy' AND roundid = $round->id AND energy < $round->max_energy AND energy + $round->energy >= $round->max_energy\n" );
 				$fullTurnUsers = $database->query( "SELECT users_rounds.userid FROM users_rounds INNER JOIN users_notifications_settings ON users_rounds.userid = users_notifications_settings.userid WHERE type = 'energy' AND roundid = $round->id AND energy < $round->max_energy AND energy + $round->energy >= $round->max_energy" );
 				if( $fullTurnUsers ) while( $u = $fullTurnUsers->fetch_object() ) {
+                    print_r( 'Full: ' . $u->userid );
 					$packet = new stdClass();
 					$packet->userid = $u->userid;
 					$packet->type = "energy";
@@ -209,8 +210,8 @@
 				$database->query( "UPDATE users_rounds SET energy = energy + $round->energy WHERE energy < $round->max_energy AND roundid = $round->id" );
 				
 				//Redo the rankings for each round						
-				$database->query( "DELETE FROM rankings WHERE roundid = $round->id" );
-				$results = $database->query( "INSERT INTO rankings SELECT @rownum := @rownum + 1 AS rank, users.userid, roundid, power, land FROM users_rounds users, (SELECT @rownum :=0)r WHERE roundid = $round->id ORDER BY power DESC, id ASC" );
+				//$database->query( "DELETE FROM rankings WHERE roundid = $round->id" );
+				//$results = $database->query( "INSERT INTO rankings SELECT @rownum := @rownum + 1 AS rank, users.userid, roundid, power, land FROM users_rounds users, (SELECT @rownum :=0)r WHERE roundid = $round->id ORDER BY power DESC, id ASC" );
 			}
 		}		
 		

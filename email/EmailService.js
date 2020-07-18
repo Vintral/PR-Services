@@ -1,5 +1,5 @@
 const redis = require( 'redis' );
-const Logger = require( '../../logger' );
+const Logger = require( './logger' );
 const mailer = require( 'nodemailer' );
 
 //==========================================//
@@ -36,6 +36,10 @@ async function onMessage( channel, data ) {
     if( !to ) return Logger.logError( "Missing Email Address" );
     if( !subject ) return Logger.logError( "Missing Subject" );
     if( !body ) return Logger.logError( "Missing Body" );
+
+    console.log( to );
+    console.log( subject );
+    console.log( body );
 
 	let transporter = mailer.createTransport( {
 		host: "smtp.zoho.com",

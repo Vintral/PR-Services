@@ -5,6 +5,8 @@ const database = require( './database' );
 const firebase = require( 'firebase-admin' );
 const firebaseServiceAccount = require( './serviceAccountKey.json' );
 
+require('dotenv').config();
+
 //==========================================//
 //	Constants								//
 //==========================================//
@@ -23,8 +25,8 @@ firebase.initializeApp( {
 //	Redis									//
 //==========================================//
 const redisInfo = {
-    server: "pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com",
-    port:6379
+    server: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT
 }
 
 const redisListener = redis.createClient( redisInfo.port, redisInfo.server );

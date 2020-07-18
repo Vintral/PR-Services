@@ -1,6 +1,8 @@
 var mysql = require( 'mysql2/promise' );
 var Logger = require( './logger' );
 
+require('dotenv').config();
+
 var	EventEmitter = require( "events" ).EventEmitter;
 
 class Database extends EventEmitter {
@@ -9,12 +11,12 @@ class Database extends EventEmitter {
 		
 		this._debug = true;
 		this.database = mysql.createPool( {
-			host : '104.236.71.139',
-			connectionLimit: 125,
+			host : process.env.DB_HOST,
+			connectionLimit: process.env.DB_CONNECTION_LIMIT,
 			queueLimit: 0,
-			user : 'temp',			
-			password : 't3mp',
-			database : 'temp',
+			user : process.env.DB_USER,			
+			password : process.env.DB_PASSWORD,
+			database : process.env.DB_NAME,
 			debug : false
 		} );
 		

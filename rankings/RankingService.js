@@ -60,25 +60,25 @@ async function onMessage( channel, data ) {
   let result = "";
   switch( channel ) {
     case "SET_POWER":
-      Logger.logServer( "SET POWER" );
-      console.log( data );
+      //Logger.logServer( "SET POWER" );
+      //console.log( data );
       
       await removeAsync( "round-" + data.roundid, "2" );
       await removeAsync( "round-" + data.roundid, "3" );
       await removeAsync( "round-" + data.roundid, "4" );
 
       let result = await addAsync( "round-" + data.roundid, data.power, data.username );        
-      console.log( result );
+      //console.log( result );
 
       result = await getRange( "round-" + data.roundid, 0, 10 );
-      console.log( result );
+      //console.log( result );
 
       result = await getRange( "round-" + data.roundid, 0, 10, "withscores" );
-      console.log( result );
+      //console.log( result );
       break;
     case "GET_RANKINGS": {
       console.log( "GET_RANKINGS" );
-      console.log( data );
+      //console.log( data );
 
       let page = data.page || 0;
       let perPage = data.perPage || 20;
