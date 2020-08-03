@@ -1,8 +1,8 @@
 <?php
-  include_once( "includes/settings.php" );
+    include_once( "includes/settings.php" );
     
 	// Create connection
-	$database = new mysqli( $servername, $username, $password, $db );
+    $database = new mysqli( $servername, $username, $password, $db );
 
 	// Create and connect to redis
 	$redis = new Redis();
@@ -15,18 +15,22 @@
 	function updateUserUpkeep( $uid, $rid ) {		
 		global $database;
 		global $foodPerPopulation;
-		global $goldPerPopulation;
+        global $goldPerPopulation;
+        global $LAND_PRECISION;
+        global $redis;
 		
-		$result = $database->query( "SELECT land FROM users_rounds WHERE userid = $uid AND roundid = $rid LIMIT 1" );
+		$result = $database->query( "SELECT land, username FROM users_rounds INNER JOIN users ON users.id = users_rounds.userid WHERE userid = $uid AND roundid = $rid LIMIT 1" );
 		$result = $result->fetch_object();		
-		$power = $result->land * 5;		
+		$power = $result->land / $LAND_PRECISION * 5;		
 		
 		$army = $database->query( "SELECT quantity, attack, defense, ( quantity * ( attack + defense ) ) AS total FROM users_rounds_units INNER JOIN units ON units.id = unitid WHERE userid = $uid AND roundid = $rid" );
 		while( $unit = $army->fetch_object() ) {			
 			$power += intval( $unit->total );			
-		};
+        };
+
+        $redis->publish( 'SET_POWER', json_encode( (object)[ 'userid'=>$uid, 'username'=>$result->username, 'roundid'=>$rid, 'power'=>$power, 'from'=>'CRON' ] ) );
 			
-		$database->query( "UPDATE users_rounds LEFT JOIN ( SELECT userid, roundid, SUM( quantity * upkeep_gold ) as sumGold, SUM( quantity * upkeep_food ) AS sumFood FROM users_rounds_units INNER JOIN units ON unitid = units.id WHERE userid = $uid AND roundid = $rid GROUP BY userid, roundid ) AS s ON s.userid = users_rounds.userid SET users_rounds.power = $power, users_rounds.gold_upkeep = IF( s.sumGold, s.sumGold, 0 ), users_rounds.food_upkeep = IF( s.sumFood, s.sumFood, 0 ) + users_rounds.population * $foodPerPopulation, users_rounds.gold_income = users_rounds.population * $goldPerPopulation WHERE users_rounds.userid = $uid AND users_rounds.roundid = $rid" );				
+		$database->query( "UPDATE users_rounds LEFT JOIN ( SELECT userid, roundid, SUM( quantity * upkeep_gold ) as sumGold, SUM( quantity * upkeep_food ) AS sumFood FROM users_rounds_units INNER JOIN units ON unitid = units.id WHERE userid = $uid AND roundid = $rid GROUP BY userid, roundid ) AS s ON s.userid = users_rounds.userid SET users_rounds.power = $power, users_rounds.gold_upkeep = IF( s.sumGold, s.sumGold, 0 ), users_rounds.food_upkeep = IF( s.sumFood, s.sumFood, 0 ) + users_rounds.population * $foodPerPopulation, users_rounds.gold_income = users_rounds.population * $goldPerPopulation WHERE users_rounds.userid = $uid AND users_rounds.roundid = $rid" );
 	}
 	
 	function recordEvent( $uid, $rid, $msg, $type ) {		
@@ -44,18 +48,19 @@
 	}
 	
 	function processGoldDeficits() {
-		global $database;
-		
+		global $database;                
+
 		$users = $database->query( "SELECT userid, roundid, gold + ( gold_income - gold_upkeep ) AS goldDeficit FROM users_rounds WHERE ( gold_income - gold_upkeep ) < 0 AND gold + gold_income < gold_upkeep" );		
 		if( $users && $users->num_rows > 0 ) {
-			while( $user = $users->fetch_object() ) {				
-				//Grab their units ordered by food upkeep				
+            $broken = false;
+			while( $user = $users->fetch_object() ) {
+                //Grab their units ordered by food upkeep
+                print_r( $user );
 				print_r( "SELECT quantity, unitid, ( quantity * upkeep_gold ) AS upkeep, upkeep_gold, name, plural FROM users_rounds_units INNER JOIN units ON units.id = unitid WHERE userid = $user->userid AND roundid = $user->roundid ORDER BY upkeep DESC LIMIT 1" );
 				$units = $database->query( "SELECT quantity, unitid, ( quantity * upkeep_gold ) AS upkeep, upkeep_gold, name, plural FROM users_rounds_units INNER JOIN units ON units.id = unitid WHERE userid = $user->userid AND roundid = $user->roundid ORDER BY upkeep DESC LIMIT 1" );				
 				if( $units && $units->num_rows > 0 ) {					
 					//They have units, so let's take some of them					
-					$unit = $units->fetch_object();					
-					
+					$unit = $units->fetch_object();
 					
 					//See how many we need to remove, if the entire stack, or only some						
 					$quantity = ceil( -1 * $user->goldDeficit / $unit->upkeep_gold );
@@ -74,7 +79,11 @@
 						$message = $quantity . ' ' . ( $quantity == 1 ? $unit->name : $unit->plural ) . ' abandoned you because you couldn\'t pay them!';
 						recordEvent( $user->userid, $user->roundid, $message, 'abandoned' );
 					}
-				}
+				} else {
+                    if( $broken ) die( 'WHAT' );
+                    updateUserUpkeep( $user->userid, $user->roundid );
+                    $broken = true;
+                }
 			}
 			
 			//Grab any users still in trouble

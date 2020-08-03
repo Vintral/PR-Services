@@ -5,10 +5,12 @@
 	} );
 
 	//Database settings
-	$servername = "pocket-realm.ctwbpohhunlz.us-west-1.rds.amazonaws.com";
-	$username = "pocket_realm_user";
-	$password = "Dt9Lpmr5DNfs7WKM";
+	$servername = "pocketrealm-db.ctwbpohhunlz.us-west-1.rds.amazonaws.com";
+	$username = "admin";
+	$password = "password";
 	$db = "PocketRealm";
 
-	$redisHost = "pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com";
+    $redisHost = "127.0.0.1";//"pocket-realm-redis.3u6ezl.ng.0001.usw1.cache.amazonaws.com";
+    
+    $LAND_PRECISION = 10000;
 ?>

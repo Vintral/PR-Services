@@ -63,17 +63,17 @@ async function onMessage( channel, data ) {
       //Logger.logServer( "SET POWER" );
       //console.log( data );
       
-      await removeAsync( "round-" + data.roundid, "2" );
+      /*await removeAsync( "round-" + data.roundid, "2" );
       await removeAsync( "round-" + data.roundid, "3" );
-      await removeAsync( "round-" + data.roundid, "4" );
+      await removeAsync( "round-" + data.roundid, "4" );*/
 
       let result = await addAsync( "round-" + data.roundid, data.power, data.username );        
       //console.log( result );
 
-      result = await getRange( "round-" + data.roundid, 0, 10 );
+      //result = await getRange( "round-" + data.roundid, 0, 10 );
       //console.log( result );
 
-      result = await getRange( "round-" + data.roundid, 0, 10, "withscores" );
+      //result = await getRange( "round-" + data.roundid, 0, 10, "withscores" );
       //console.log( result );
       break;
     case "GET_RANKINGS": {
@@ -97,8 +97,9 @@ async function onMessage( channel, data ) {
       packet.request = data.request;
       for( let i = 0; i < ranks.length; i += 2 ) {
         packet.ranks.push( ranks[ i ] + "|||" + ranks[ i + 1 ] );
-      }        
+      }
 
+      console.log( packet );
       redisClient.publish( data.server, JSON.stringify( packet ) );
     } break;
     case "GET_TOP_RANKINGS": {
