@@ -10,7 +10,7 @@ require('dotenv').config();
 //==========================================//
 //	Constants								//
 //==========================================//
-const duration = 300; // Set our check to look back for the last 5 mintues
+const duration = 30; // Set our check to look back for the last 5 minutes
 const max = 5; // Set the max notifications received since last sign on to 5
 
 //==========================================//
@@ -61,11 +61,15 @@ async function onMessage( channel, data ) {
 	let ids = await database.get( "SELECT token FROM users_push_tokens WHERE userid = " + userid + " AND token <> 'undefined'" );
 	ids = ids.map( id => { return id.token } );
 
-	// Various check queries
+    // Various check queries
+    let clearQuery = "DELETE FROM users_push_tokens WHERe userid = " + userid + " AND date < UNIX_TIMESTAMP() - ( 86400 * 7 )"
 	let enabledQuery = "SELECT id FROM users_notifications_settings WHERE userid = " + userid + " AND type = 'enabled' LIMIT 1";
 	let checkQuery = "SELECT id FROM users_notifications_settings WHERE userid = " + userid + " AND type = '" + type + "' LIMIT 1";
 	let lastQuery = "SELECT id FROM users_notifications WHERE userid = " + userid + " AND time > UNIX_TIMESTAMP() - " + duration + " LIMIT 1";
 	let throttleQuery = "SELECT COUNT(users_notifications.id) AS total FROM users_notifications INNER JOIN users ON users.id = userid WHERE userid = " + userid + " AND time > last_seen";
+
+    // Clear stale tokens older than a week
+    await database.execute( clearQuery );
 
 	// Make sure they have notifications enabled
 	let enabled = await database.get( enabledQuery );
@@ -80,7 +84,7 @@ async function onMessage( channel, data ) {
 	if( last && last.length !== 0 ) return;
 
 	// Have they hit our max since last sign on?
-	let throttle = await database.get( throttleQuery );
+    let throttle = await database.get( throttleQuery );    
 	if( throttle && throttle[ 0 ].total >= max ) return;
 
 	// Everything is good: They are set to receive notifications of this time and haven't
@@ -100,13 +104,15 @@ async function onMessage( channel, data ) {
 	
 	// Send the notification to each token
 	ids.forEach( id => {
-		firebase.messaging().sendToDevice( id, payload, options )
-			.then( res => { 
-				Logger.logNotification( "Notification Sent: " + id + " - " + type );			
-			} )
-			.catch( err => {
-				Logger.logError( "Error Sending Notification: " + err );
-			} );
+        if( id !== null && id !== '' ) {
+            firebase.messaging().sendToDevice( id, payload, options )
+                .then( res => { 
+                    Logger.logNotification( "Notification Sent: " + id + " - " + type );			
+                } )
+                .catch( err => {
+                    Logger.logError( "Error Sending Notification: " + err );
+                } );
+        }
 	} )
 	
 	// Record this notification
