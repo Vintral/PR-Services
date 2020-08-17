@@ -51,9 +51,9 @@ class Item {
 			this.effect = this.data.effect;
 			this.level = this.data.level;
 			
-			this.onUse = Security.decrypt( this.data.onUse );
+			//this.onUse = Security.decrypt( this.data.onUse );
 
-			console.log( this.onUse );
+			//console.log( this.onUse );
 			
 			this.available = this.data.available;					
 		}

@@ -14,7 +14,7 @@ ItemManager.database = database;
 //==========================================//
 //	Variables								//
 //==========================================//
-const throttle = 300; // Set our throttle to check in the last 5 minutes
+const throttle = 30; // Set our throttle to check in the last 5 minutes
 const jobAmount = 5;	
             
 let users = {};
@@ -77,13 +77,13 @@ async function onMessage( channel, data ) {
             result = await database.getOne( lastQuery );
             if( result ){
                 // Start up a timer
-                setTimer( server, userid );
+                setTimer( server, userid, false );
                 break;    
-            }
+            } else setTimer( server, userid, true );            
 
             // We have no recent ads claimed, let's let them know we're ready!
-            dispatch( server, { command:'JOB_READY', user:userid } );
-            setTimer( server, userid ); // To DO - REMOVE THIS
+            //dispatch( server, { command:'JOB_READY', user:userid } );
+            //setTimer( server, userid ); // To DO - REMOVE THIS
             break;
         case "USER_OFFLINE":
             Logger.logServer( "USER IS OFFLINE: " + userid );
@@ -101,7 +101,7 @@ async function onMessage( channel, data ) {
             //result = await database.execute( recordQuery );
             //console.log( result );
 
-            setTimer( userid );
+            setTimer( server, userid, false );
             break;
         case "GET_JOBS":
             Logger.logServer( "GET_JOBS" );
@@ -124,46 +124,23 @@ function clearTimer( userid ) {
         clearTimeout( users[ userid ] );
 }
 
-function setTimer( server, userid ) {
+function setTimer( server, userid, short ) {
     clearTimer( userid );
     users[ userid ] = {
         server,
         timer: setTimeout( () => {
             dispatch( server, { command:'JOB_READY', user:userid } );
-        }, 1000 * throttle )
+        }, short ? 5000 : 1000 * throttle )
     };
 }
 
 async function claimJob( userid, job ) {
     Logger.logServer( "claimJob: " + userid + " : " + job );
-
-    const rewardQuery = "SELECT reward FROM users_jobs WHERE userid = " + userid + " AND guid = '" + job + "' AND claimed = 0 LIMIT 1";
+    
     const claimQuery = "UPDATE users_jobs SET claimed = UNIX_TIMESTAMP() WHERE userid = " + userid + " AND guid = '" + job + "' LIMIT 1";
+    result = await database.execute( claimQuery );
 
-    // Find out what our reward is and save it
-    result = await database.getOne( rewardQuery );
-    if( !result || !result.reward ) return dispatchError( userid, "No Reward Found: "+ rewardQuery );
-    const { reward } = result;
-
-    const storeQuery = "INSERT INTO users_vault SET userid = " + userid + ", itemid = " + reward;
-
-    // Begin our transaction.  We'll save the item, and mark it claimed
-    let transaction = await database.beginTransaction();
-    result = await transaction.query( storeQuery );
-    if( !result || result[ 0 ].affectedRows !== 1 ) {
-        await database.rollback( transaction );
-        return dispatchError( userid, "Error Storing Item: " + storeQuery );
-    }
-
-    result = await transaction.query( claimQuery );
-    if( !result || result[ 0 ].affectedRows !== 1 ) {
-        await database.rollback( transaction );
-        return dispatchError( userid, "Error Claiming Item: " + claimQuery );
-    }
-
-    // Commit the transaction
-    await database.commit( transaction );
-    dispatch( "JOB_CLAIMED", userid, reward );
+    //const recordQuery = "INSERT INTO users_job_history SET userid = " + userid + ", job = '" + job + "', time = UNIX_TIMESTAMP();
 }
 
 async function checkJobs( userid ) {
@@ -176,16 +153,20 @@ async function checkJobs( userid ) {
     
     Logger.logServer( "We have: " + count + " jobs, we want: " + jobAmount );
 
-    while( count++ < jobAmount )			
+    while( count++ < jobAmount )
         await createJob( userid );
 }
 
 async function createJob( userid ) {
     Logger.logServer( "createJob" );
 
+    let jobsDone = await database.getOne( "SELECT COUNT(id) AS total FROM users_jobs WHERE userid = " + userid + " AND claimed > UNIX_TIMESTAMP() - 86400" );
+    let level = 1;
+    if( jobsDone > 5 ) level = 2;
+
     let jobs = await database.get( "SELECT id FROM jobs" );
     let job = jobs[ Math.floor( Math.random() * jobs.length ) ];
-    let reward = await ItemManager.getRandomItem( 2 );		
+    let reward = await ItemManager.getRandomItem( level );
     let gid = guid.v4();
     let result = await database.execute( "INSERT INTO users_jobs SET guid = '" + gid + "', userid = " + userid + ", reward = " + reward.id + ", job = " + job.id + ", claimed = 0, expires = UNIX_TIMESTAMP() + ( 86400 * 2 )" );
 }
@@ -205,7 +186,7 @@ async function getJobs( userid, server, request ) {
     let vault = await database.get( "SELECT vault_size, COUNT(users_vault.id) AS current_items FROM users INNER JOIN users_vault ON userid = users.id WHERE users.id = " + userid );
     console.log( vault );
 
-    let jobs = await database.get( "SELECT guid, reward, header, body FROM users_jobs INNER JOIN jobs ON jobs.id = job WHERE userid = " + userid + " AND claimed = 0" );
+    let jobs = await database.get( "SELECT guid, reward, job FROM users_jobs INNER JOIN jobs ON jobs.id = job WHERE userid = " + userid + " AND claimed = 0" );
     for( var job in jobs ) {			
         jobs[ job ].type = ItemManager.getItemByID( jobs[ job ].reward ).type;
         delete jobs[ job ].reward;			
