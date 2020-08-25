@@ -1,15 +1,18 @@
 <?php
 class User {
-	private $id;	
+    public $id;
+    public $power;
+    public $land;
+
 	private $database;
 	
 	private $roundid;
 	
 	private $loaded;
-	private $_debug = true;
+	private $_debug = false;
 	
 	public function __construct( $data ) {
-		if( $data->id !== 0 ) $this->debug( "Created: " . $data->id );
+        if( $data->id !== 0 ) $this->debug( "Created: " . $data->id );
 		else $this->debug( "Created" );			
 		
 		$this->id = $data->id;
@@ -26,7 +29,7 @@ class User {
 			$this->debug( "creditGems: $reward" );
 			$this->database->executeQuery( "UPDATE users SET gems = gems + $reward WHERE id = $this->id" );
 		}
-	}
+    }        
 	
 	public function populationLeave( $amount ) {
 		if( $this->id ) {
@@ -49,18 +52,26 @@ class User {
 		if( $this->id ) {			
 			$data = $this->database->getObject( "SELECT * FROM users WHERE id = " . $this->id );
 			if( $data ) {
-				print_r( "Get Data\n" );
-				print_r( "SELECT * FROM users_rounds WHERE userid = " . $this->id . " AND roundid = " . $this->roundid . "\n" );
+				//print_r( "Get Data\n" );
+				//print_r( "SELECT * FROM users_rounds WHERE userid = " . $this->id . " AND roundid = " . $this->roundid . "\n" );
 				$data = $this->database->getObject( "SELECT * FROM users_rounds WHERE userid = " . $this->id . " AND roundid = " . $this->roundid );
-				print_r( $data );
-				//$this->population = $data->population;
+                //print_r( $data );
+                
+                $this->land = $data->land;
+                $this->power = $data->power;
 				
 				$this->loaded = true;
 			}
 			
 			$this->loaded = true;
 		}
-	}
+    }
+    
+    public function log( $action, $round = true ) {
+        $this->debug( 'log: ' . $action );
+        print_r( "INSERT INTO users_log ( userid, roundid, action, time ) VALUES ( $this->id, " . ( $round ? $this->roundid : 0 ) . ", '$action', UNIX_TIMESTAMP() )" );
+        $this->database->executeQuery( "INSERT INTO users_log ( userid, roundid, action, time ) VALUES ( $this->id, " . ( $round ? $this->roundid : 0 ) . ", '$action', UNIX_TIMESTAMP() )" );
+    }
 	
 	private function debug( $msg ) {
 		if( $this->_debug ) 

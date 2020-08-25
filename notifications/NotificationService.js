@@ -51,6 +51,14 @@ async function onConnect() {
 	Logger.logServer( "Connected to Redis Server" );
 }
 
+function getTitle( type ) {
+    switch( type ) {
+        case "mail": return "Message";
+    }
+
+    return "";
+}
+
 async function onMessage( channel, data ) {
 	Logger.logServer( "Message: " + channel + ":" + data );
 	
@@ -70,7 +78,7 @@ async function onMessage( channel, data ) {
 
     // Clear stale tokens older than a week
     await database.execute( clearQuery );
-
+    
 	// Make sure they have notifications enabled
 	let enabled = await database.get( enabledQuery );
 	if( !enabled || enabled.length === 0 ) return;
@@ -92,7 +100,7 @@ async function onMessage( channel, data ) {
 	// Create the Notification
 	let payload = {
 		notification: {
-			title: "TITLE",
+			title: getTitle( type ),
 			body: message,
 		}
 	};

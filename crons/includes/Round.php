@@ -3,8 +3,8 @@ class Round {
 	private $id;
 	private $database;
 	
-	private $turns;
-	private $maxTurns;
+	private $energy;
+	private $maxEnergy;
 	private $land;
 	private $gold;
 	private $food;
@@ -16,7 +16,7 @@ class Round {
 	private $duration;
 	
 	private $loaded;
-	private $_debug = false;
+	private $_debug = true;
 	
 	public function getRecurring() { return $this->recurring; }
 	public function setRecurring( $value ) { $this->recurring = $value; }
@@ -32,14 +32,24 @@ class Round {
 		
 		$this->id = $id;
 		$this->load();
-	}
+    }
+    
+    private function getGemReward( $tier ) {
+        switch( $tier ) {
+            case 'platinum': return 50;
+            case 'gold': return 25;
+            case 'silver': return 10;
+            case 'bronze': return 5;
+            default: return 0;
+        }
+    }
 	
 	public function finalize() {
 		$this->debug( "finalize" );
 		
 		if( $this->loaded ) {
-			$this->database->executeQuery( "UPDATE rounds SET active = 0 WHERE id = $this->id" );
-			$this->database->executeQuery( "UPDATE users SET current_round = 0 WHERE current_round = $this->id" );
+			//$this->database->executeQuery( "UPDATE rounds SET active = 0 WHERE id = $this->id" );
+			//$this->database->executeQuery( "UPDATE users SET current_round = 0 WHERE current_round = $this->id" );
 			
 			$totalUsers = $this->database->getValue( "SELECT COUNT(id) FROM users_rounds WHERE roundid = $this->id" );
 			$this->debug( "Total Users: " . $totalUsers );
@@ -48,36 +58,42 @@ class Round {
 			array_push( $tiers, ceil( $totalUsers * .01 ) );
 			array_push( $tiers, ceil( $totalUsers * .05 ) );
 			array_push( $tiers, ceil( $totalUsers * .10 ) );
-			array_push( $tiers, ceil( $totalUsers * .25 ) );
-			
-			$winners = $this->database->getObjects( "SELECT userid FROM users_rounds WHERE roundid = $this->id LIMIT " . $tiers[ 3 ] );
+            array_push( $tiers, ceil( $totalUsers * .25 ) );
+                        
+			$players = $this->database->getObjects( "SELECT userid FROM users_rounds WHERE roundid = $this->id ORDER BY power DESC" );
 			$count = 0;
-			foreach( $winners as $winner ) {
-				$reward = "";
+			foreach( $players as $player ) {
+				$tier = "";
 				
-				if( $count < $tiers[ 0 ] ) $reward = 25;
-				else if( $count < $tiers[ 1 ] ) $reward = 15;
-				else if( $count < $tiers[ 2 ] ) $reward = 10;
-				else if( $count < $tiers[ 3 ] ) $reward = 5;
-			
-				$user = new User( $winner->userid );
-				$user->creditGems( $reward );
-				
-				$count++;
+				if( $count < $tiers[ 0 ] ) $tier = "platinum";
+				else if( $count < $tiers[ 1 ] ) $tier = "gold";
+                else if( $count < $tiers[ 2 ] ) $tier = "silver";
+                else if( $count < $tiers[ 3 ] ) $tier = "bronze";
+                else $tier = "none";
+            
+                $reward = $this->getGemReward( $tier );
+                
+				$user = new User( (object)[ 'id' => $player->userid, 'roundid' => $this->id ] );
+                $user->creditGems( $reward );
+                                
+                $this->database->executeQuery( "INSERT INTO rankings ( `rank`, userid, round, power, land, tier, earned ) VALUES ( " . ( $count + 1 ) . ", $user->id, $this->id, $user->power, " . floor( $user->land / 10000 ) . ", '$tier', $reward )" );
+                
+                $count++;
+                $user->log( "Rank: $count Round: $this->id Earned: $reward gems", false );
 			}
 
 			$this->database->executeQuery( "UPDATE users_rounds SET active = 0 WHERE roundid = $this->id" );
 			$this->database->executeQuery( "UPDATE rounds SET processed = 1 WHERE id = $this->id" );
 			
-			return $this->recurring;			
+			return $this->recurring;
 		} else $this->debug( "Not Loaded" );
 	}
 	
 	public function create() {
 		$this->debug( "create" );
-		$this->debug( "INSERT INTO rounds SET turns = $this->turns, max_turns = $this->maxTurns, land = $this->land, gold = $this->gold, food = $this->food, wood = $this->wood, metal = $this->metal, active = $this->active, expires = UNIX_TIMESTAMP() + ( $this->duration * 86400 ), recurring = $this->recurring, days = $this->duration" );
+		$this->debug( "INSERT INTO rounds SET energy = $this->energy, max_energy = $this->maxEnergy, land = $this->land, gold = $this->gold, food = $this->food, wood = $this->wood, metal = $this->metal, active = $this->active, expires = UNIX_TIMESTAMP() + ( $this->duration * 86400 ), recurring = $this->recurring, days = $this->duration" );
 		
-		$rid = $this->database->executeQuery( "INSERT INTO rounds SET turns = $this->turns, max_turns = $this->maxTurns, land = $this->land, gold = $this->gold, food = $this->food, wood = $this->wood, metal = $this->metal, active = $this->active, expires = UNIX_TIMESTAMP() + ( $this->duration * 86400 ), recurring = $this->recurring, days = $this->duration" );
+		$rid = $this->database->executeQuery( "INSERT INTO rounds SET energy = $this->energy, max_energy = $this->maxEnergy, land = $this->land, gold = $this->gold, food = $this->food, wood = $this->wood, metal = $this->metal, active = $this->active, expires = UNIX_TIMESTAMP() + ( $this->duration * 86400 ), recurring = $this->recurring, days = $this->duration" );
 		
 		$this->database->executeQuery( "INSERT INTO market SET roundid = $rid, type='wood', price = 1.5, total_bought = 100, total_sold = 100" );
 		$this->database->executeQuery( "INSERT INTO market SET roundid = $rid, type='stone', price = 1.5, total_bought = 100, total_sold = 100" );
@@ -131,8 +147,8 @@ class Round {
 		if( $this->id ) {			
 			$data = $this->database->getObject( "SELECT * FROM rounds WHERE id = " . $this->id );
 			if( $data ) {
-				$this->turns = $data->turns;
-				$this->maxTurns = $data->max_turns;
+				$this->energy = $data->energy;
+				$this->maxEnergy = $data->max_energy;
 				$this->land = $data->land;
 				$this->gold = $data->gold;
 				$this->food = $data->food;
@@ -151,8 +167,8 @@ class Round {
 	}
 	
 	private function setDefaults() {
-		$this->turns = 10;
-		$this->maxTurns = 250;
+		$this->energy = 10;
+		$this->maxEnergy = 250;
 		$this->land = 100;
 		$this->gold = 500;
 		$this->food = 200;
